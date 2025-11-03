@@ -44,11 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
             border-radius: 4px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-
         .list-group-item {
             cursor: pointer;
         }
-
         .list-group-item:hover {
             background-color: #f8f9fa;
         }
@@ -58,12 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
     <div class="search-container">
         <h1 class="mb-4">Búsqueda de Clientes</h1>
         <form method="POST" action="index.php" class="position-relative">
-    <div class="input-group mb-3">
-        <input type="text" id="search" name="search_term" class="form-control" placeholder="Nombre o Apellido" autocomplete="off" onkeyup="fetchSuggestions()" required>
-        <button type="submit" class="btn btn-primary">Buscar Cliente</button>
-    </div>
-    <ul id="suggestions" class="list-group position-absolute w-100" style="display: none;"></ul>
-</form>
+            <div class="input-group mb-3">
+                <input type="text" id="search" name="search_term" class="form-control" placeholder="Nombre o Apellido" autocomplete="off" onkeyup="fetchSuggestions()" required>
+                <button type="submit" class="btn btn-primary">Buscar Cliente</button>
+            </div>
+            <ul id="suggestions" class="list-group position-absolute w-100" style="display: none;"></ul>
+        </form>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#registerClientModal">Registrar Nuevo Cliente</button>
     </div>
 
@@ -81,26 +79,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
                     </tr>
                 </thead>
                 <tbody>
-    <?php foreach ($searchResults as $result): ?>
-        <tr>
-            <td><?php echo htmlspecialchars($result['nombre'] . ' ' . $result['apellido']); ?></td>
-            <td><?php echo htmlspecialchars($result['fecha'] ?? 'Sin fecha'); ?></td>
-            <td><?php echo htmlspecialchars($result['trabajo_realizado'] ?? 'Sin trabajo'); ?></td>
-            <td><?php echo htmlspecialchars($result['estilista'] ?? 'Sin estilista'); ?></td>
-            <td>
-                <button class="btn btn-warning btn-sm" onclick="editWork(<?php echo $result['id']; ?>)">Editar</button>
-                <button class="btn btn-success btn-sm" onclick="addWork(<?php echo $result['id']; ?>)">Agregar Trabajo</button>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-</tbody>
+                    <?php foreach ($searchResults as $result): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($result['nombre'] . ' ' . $result['apellido']); ?></td>
+                            <td><?php echo htmlspecialchars($result['fecha'] ?? 'Sin fecha'); ?></td>
+                            <td><?php echo htmlspecialchars($result['trabajo_realizado'] ?? 'Sin trabajo'); ?></td>
+                            <td><?php echo htmlspecialchars($result['estilista'] ?? 'Sin estilista'); ?></td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="editWork(<?php echo $result['id']; ?>, '<?php echo htmlspecialchars($result['trabajo_realizado'] ?? ''); ?>', '<?php echo htmlspecialchars($result['estilista'] ?? ''); ?>', '<?php echo htmlspecialchars($result['fecha'] ?? ''); ?>')">Editar</button>
+                                <button class="btn btn-success btn-sm" onclick="addWork(<?php echo $result['id']; ?>)">Agregar Trabajo</button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
             </table>
         </div>
     <?php elseif ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
         <div class="alert alert-warning mt-4">No se encontraron resultados para "<?php echo htmlspecialchars($_POST['search_term']); ?>"</div>
     <?php endif; ?>
 
-    <!-- Modal para registrar cliente -->
+    <!-- Modal Registrar Cliente -->
     <div class="modal fade" id="registerClientModal" tabindex="-1" aria-labelledby="registerClientModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -128,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
         </div>
     </div>
 
-    <!-- Modal para Editar Trabajo -->
+    <!-- Modal Editar Trabajo -->
     <div class="modal fade" id="editWorkModal" tabindex="-1" aria-labelledby="editWorkModalTitle" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -136,31 +134,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
                     <h5 class="modal-title" id="editWorkModalTitle">Editar Trabajo</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="editWorkForm">
+                <form id="editWorkForm" method="POST" action="process_edit.php">
+                    <input type="hidden" name="cliente_id" id="editClienteId">
+                    <div class="modal-body">
                         <div class="mb-3">
                             <label for="editWorkField" class="form-label">Trabajo Realizado</label>
-                            <input type="text" class="form-control" id="editWorkField" required>
+                            <input type="text" class="form-control" id="editWorkField" name="trabajo_realizado" required>
                         </div>
                         <div class="mb-3">
                             <label for="editStylistField" class="form-label">Estilista</label>
-                            <input type="text" class="form-control" id="editStylistField" required>
+                            <input type="text" class="form-control" id="editStylistField" name="estilista" required>
                         </div>
                         <div class="mb-3">
                             <label for="editDateField" class="form-label">Fecha</label>
-                            <input type="date" class="form-control" id="editDateField" required>
+                            <input type="date" class="form-control" id="editDateField" name="fecha" required>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="submit" class="btn btn-primary" form="editWorkForm">Guardar Cambios</button>
-                </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Modal para Agregar Trabajo -->
+    <!-- Modal Agregar Trabajo -->
     <div class="modal fade" id="addWorkModal" tabindex="-1" aria-labelledby="addWorkModalTitle" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -168,31 +167,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_term'])) {
                     <h5 class="modal-title" id="addWorkModalTitle">Agregar Trabajo</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="addWorkForm">
+                <form id="addWorkForm" method="POST" action="process_add.php">
+                    <input type="hidden" name="cliente_id" id="addClienteId">
+                    <div class="modal-body">
                         <div class="mb-3">
                             <label for="addWorkField" class="form-label">Trabajo Realizado</label>
-                            <input type="text" class="form-control" id="addWorkField" required>
+                            <input type="text" class="form-control" id="addWorkField" name="trabajo_realizado" required>
                         </div>
                         <div class="mb-3">
                             <label for="addStylistField" class="form-label">Estilista</label>
-                            <input type="text" class="form-control" id="addStylistField" required>
+                            <input type="text" class="form-control" id="addStylistField" name="estilista" required>
                         </div>
                         <div class="mb-3">
                             <label for="addDateField" class="form-label">Fecha</label>
-                            <input type="date" class="form-control" id="addDateField" required>
+                            <input type="date" class="form-control" id="addDateField" name="fecha" required>
                         </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="submit" class="btn btn-primary" form="addWorkForm">Guardar Trabajo</button>
-                </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Trabajo</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/scripts.js"></script>
+    <script>
+        // Funciones para los botones
+        function editWork(clienteId, trabajo, estilista, fecha) {
+            document.getElementById('editClienteId').value = clienteId;
+            document.getElementById('editWorkField').value = trabajo || '';
+            document.getElementById('editStylistField').value = estilista || '';
+            document.getElementById('editDateField').value = fecha || '';
+            new bootstrap.Modal(document.getElementById('editWorkModal')).show();
+        }
+
+        function addWork(clienteId) {
+            document.getElementById('addClienteId').value = clienteId;
+            // Limpiar campos para nuevo trabajo
+            document.getElementById('addWorkField').value = '';
+            document.getElementById('addStylistField').value = '';
+            document.getElementById('addDateField').value = '';
+            new bootstrap.Modal(document.getElementById('addWorkModal')).show();
+        }
+
+        // Autocompletado
+        function fetchSuggestions() {
+            const input = document.getElementById('search').value;
+            const suggestionsDiv = document.getElementById('suggestions');
+            
+            if (input.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            fetch(`get_suggestions.php?term=${encodeURIComponent(input)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        suggestionsDiv.innerHTML = data.map(item => `
+                            <li class="list-group-item" onclick="selectSuggestion('${item.nombre} ${item.apellido}')">
+                                ${item.nombre} ${item.apellido}
+                            </li>
+                        `).join('');
+                        suggestionsDiv.style.display = 'block';
+                    } else {
+                        suggestionsDiv.style.display = 'none';
+                    }
+                });
+        }
+
+        function selectSuggestion(fullName) {
+            document.getElementById('search').value = fullName;
+            document.getElementById('suggestions').style.display = 'none';
+        }
+    </script>
 </body>
 </html>
