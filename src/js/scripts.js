@@ -1,15 +1,17 @@
-function fetchSuggestions() {
-    console.log("fetchSuggestions ejecutado"); // Depuración
-    const search = document.getElementById('search').value;
-    const suggestions = document.getElementById('suggestions');
+let currentFocus = -1;
 
-    if (search.length > 0) {
-        fetch(`search.php?term=${search}`)
+function fetchSuggestions() {
+    const searchInput = document.getElementById('search');
+    const suggestions = document.getElementById('suggestions');
+    const term = searchInput.value;
+
+    if (term.length > 0) {
+        fetch(`search.php?term=${term}`)
             .then(response => response.json())
             .then(data => {
-                console.log("Datos recibidos:", data); // Depuración
                 suggestions.innerHTML = '';
                 suggestions.style.display = 'block';
+                currentFocus = -1;
 
                 if (data.length === 0) {
                     const noResults = document.createElement('li');
@@ -17,10 +19,11 @@ function fetchSuggestions() {
                     noResults.textContent = 'No se encontraron resultados';
                     suggestions.appendChild(noResults);
                 } else {
-                    data.forEach(client => {
+                    data.forEach((client, index) => {
                         const item = document.createElement('li');
                         item.className = 'list-group-item list-group-item-action';
                         item.textContent = `${client.nombre} ${client.apellido}`;
+                        // Mouse event
                         item.addEventListener('click', () => {
                             selectClient(client.id, client.nombre, client.apellido);
                         });
@@ -37,6 +40,56 @@ function fetchSuggestions() {
     }
 }
 
+// Keyboard navigation listener
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('search');
+
+    // Trigger search when text changes
+    searchInput.addEventListener('input', fetchSuggestions);
+
+    searchInput.addEventListener('keydown', function (e) {
+        const suggestions = document.getElementById('suggestions');
+        const items = suggestions.getElementsByTagName('li');
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault(); // Prevent page scroll
+            currentFocus++;
+            addActive(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault(); // Prevent page scroll
+            currentFocus--;
+            addActive(items);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentFocus > -1 && items) {
+                if (items[currentFocus]) {
+                    items[currentFocus].click();
+                }
+            } else {
+                // If no suggestion selected, submit normally
+                this.form.submit();
+            }
+        }
+    });
+});
+
+function addActive(items) {
+    if (!items) return false;
+    removeActive(items);
+    if (currentFocus >= items.length) currentFocus = 0;
+    if (currentFocus < 0) currentFocus = items.length - 1;
+    items[currentFocus].classList.add('active');
+
+    // Scroll into view logic could go here if list is long
+    items[currentFocus].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function removeActive(items) {
+    for (let i = 0; i < items.length; i++) {
+        items[i].classList.remove('active');
+    }
+}
+
 function selectClient(id, nombre, apellido) {
     const search = document.getElementById('search');
     const suggestions = document.getElementById('suggestions');
@@ -45,37 +98,56 @@ function selectClient(id, nombre, apellido) {
     suggestions.innerHTML = '';
     suggestions.style.display = 'none';
 
-    console.log(`Cliente seleccionado: ID=${id}, Nombre=${nombre}, Apellido=${apellido}`);
+    // Auto-submit the form to "open" the client
+    search.form.submit();
 }
 
-function editWork(clientId) {
-    // Aquí puedes cargar los datos del trabajo desde el servidor
-    fetch(`getWork.php?clientId=${clientId}`)
-        .then(response => response.json())
-        .then(data => {
-            // Llenar el modal con los datos del trabajo
-            document.getElementById('editWorkModalTitle').textContent = `Editar Trabajo - Cliente ID: ${clientId}`;
-            document.getElementById('editWorkField').value = data.trabajo_realizado || '';
-            document.getElementById('editStylistField').value = data.estilista || '';
-            document.getElementById('editDateField').value = data.fecha || '';
+function editWork(clientId, trabajo, estilista, fecha) {
+    document.getElementById('editClienteId').value = clientId;
+    document.getElementById('editWorkField').value = trabajo || '';
+    document.getElementById('editStylistField').value = estilista || '';
+    document.getElementById('editDateField').value = fecha || '';
 
-            // Mostrar el modal
-            const editModal = new bootstrap.Modal(document.getElementById('editWorkModal'));
-            editModal.show();
-        })
-        .catch(error => {
-            console.error('Error al cargar los datos del trabajo:', error);
-        });
+    // Optional: Update title if element exists
+    const titleEl = document.getElementById('editWorkModalTitle');
+    if (titleEl) {
+        titleEl.textContent = `Editar Trabajo - Cliente ID: ${clientId}`;
+    }
+
+    const editModal = new bootstrap.Modal(document.getElementById('editWorkModal'));
+    editModal.show();
 }
 
 function addWork(clientId) {
-    // Configurar el modal para agregar un nuevo trabajo
-    document.getElementById('addWorkModalTitle').textContent = `Agregar Trabajo - Cliente ID: ${clientId}`;
+    document.getElementById('addClienteId').value = clientId;
     document.getElementById('addWorkField').value = '';
     document.getElementById('addStylistField').value = '';
     document.getElementById('addDateField').value = '';
 
-    // Mostrar el modal
+    const titleEl = document.getElementById('addWorkModalTitle');
+    if (titleEl) {
+        titleEl.textContent = `Agregar Trabajo - Cliente ID: ${clientId}`;
+    }
+
     const addModal = new bootstrap.Modal(document.getElementById('addWorkModal'));
     addModal.show();
+
+    // Set default date to Today (Local)
+    document.getElementById('addDateField').value = getLocalTodayDate();
 }
+
+function getLocalTodayDate() {
+    const now = new Date();
+    // Adjust to local timezone as YYYY-MM-DD
+    const offset = now.getTimezoneOffset() * 60000;
+    const local = new Date(now.getTime() - offset);
+    return local.toISOString().split('T')[0];
+}
+
+// Initialize Register Modal Date on Load
+document.addEventListener('DOMContentLoaded', () => {
+    const newFechaInput = document.querySelector('input[name="new_fecha"]');
+    if (newFechaInput) {
+        newFechaInput.value = getLocalTodayDate();
+    }
+});

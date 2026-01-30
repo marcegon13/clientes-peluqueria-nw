@@ -4,9 +4,9 @@ require_once 'classes/ClientManager.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $manager = new ClientManager($conn);
-    // $_POST contains 'nombre', 'apellido', 'new_trabajo', etc.
-    // We pass the whole array to the manager to handle validation and retrieval
-    $manager->createClient($_POST);
+    $cliente_id = isset($_POST['delete_id']) ? intval($_POST['delete_id']) : 0;
+    
+    $manager->deleteClient($cliente_id);
 } else {
     header("Location: index.php");
 }

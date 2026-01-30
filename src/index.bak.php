@@ -1,32 +1,97 @@
 <?php
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-// error_log("Error message"); // Use for debugging instead of echo
-
 include 'db/connection.php';
-require_once 'classes/ClientListController.php';
 
-// Initialize Controller
-$controller = new ClientListController($conn);
+$searchResults = [];
+$searchPerformed = false;
+$listMode = false;
 
-// Get Parameters from Request
-$params = $controller->getParams();
+// Sorting parameters
+$sortBy = $_POST['sort_by'] ?? 'nombre'; // Default sort
+$sortOrder = $_POST['sort_order'] ?? 'ASC'; // Default order
+$sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC'; // Validate
 
-// Fetch Data
-$data = $controller->fetchResults($params);
+// Limit parameters
+$limit = isset($_POST['limit']) ? (int)$_POST['limit'] : 50;
+if ($limit < 50) $limit = 50;
+$queryLimit = $limit + 1; // Fetch one extra to check if there are more
+$hasMore = false;
 
-// Extract variables for the View
-$searchResults = $data['results'];
-$hasMore = $data['hasMore'];
-$searchPerformed = $data['searchPerformed'];
-$listMode = $data['listMode'];
+// Helper to determine next sort order for UI
+function getNextSortOrder($currentCol, $activeCol, $activeOrder) {
+    if ($currentCol === $activeCol) {
+        return $activeOrder === 'ASC' ? 'DESC' : 'ASC';
+    }
+    return 'ASC';
+}
 
-// View Variables from Params (for maintaining state in forms)
-$sortBy = $params['sort_by'];
-$sortOrder = $params['sort_order'];
-$limit = $params['limit'];
-$searchTerm = $params['search_term'];
+function getSortIcon($currentCol, $activeCol, $activeOrder) {
+    if ($currentCol !== $activeCol) return '<i class="fas fa-sort text-muted small ms-1"></i>';
+    return $activeOrder === 'ASC' ? '<i class="fas fa-sort-up text-primary small ms-1"></i>' : '<i class="fas fa-sort-down text-primary small ms-1"></i>';
+}
 
+// Logic: Search Term takes precedence over List All if typed.
+// ALLOW GET for search_term to support redirection
+$searchTerm = isset($_POST['search_term']) ? trim($_POST['search_term']) : (isset($_GET['search_term']) ? trim($_GET['search_term']) : '');
+
+if (($_SERVER['REQUEST_METHOD'] === 'POST' || $searchTerm !== '') && (isset($_POST['list_all']) || ($searchTerm === '' && isset($_POST['active_mode']) && $_POST['active_mode'] === 'list'))) {
+    $searchPerformed = true;
+    $listMode = true;
+    
+    // Valid columns for SQL
+    $validCols = ['nombre' => 'c.nombre', 'apellido' => 'c.apellido', 'fecha' => 'fecha'];
+    $orderBySQL = $validCols[$sortBy] ?? 'c.nombre';
+
+    $stmt = $conn->prepare("
+        SELECT c.id, c.nombre, c.apellido, MAX(t.fecha) as fecha, 
+               (SELECT trabajo_realizado FROM trabajos t2 WHERE t2.cliente_id = c.id ORDER BY fecha DESC LIMIT 1) as trabajo_realizado,
+               (SELECT estilista FROM trabajos t3 WHERE t3.cliente_id = c.id ORDER BY fecha DESC LIMIT 1) as estilista
+        FROM clientes c
+        LEFT JOIN trabajos t ON c.id = t.cliente_id
+        GROUP BY c.id
+        ORDER BY $orderBySQL $sortOrder
+        LIMIT ?
+    ");
+    $stmt->bind_param("i", $queryLimit);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $searchResults[] = $row;
+    }
+}
+else if ($searchTerm !== '') { 
+    // Search by term (POST or GET)
+    $searchPerformed = true;
+    
+    $validCols = ['nombre' => 'c.nombre', 'apellido' => 'c.apellido', 'fecha' => 't.fecha'];
+    $orderBySQL = $validCols[$sortBy] ?? 'c.nombre';
+
+    $stmt = $conn->prepare("
+        SELECT c.id, c.nombre, c.apellido, MAX(t.fecha) as fecha,
+               (SELECT trabajo_realizado FROM trabajos t2 WHERE t2.cliente_id = c.id ORDER BY fecha DESC LIMIT 1) as trabajo_realizado,
+               (SELECT estilista FROM trabajos t3 WHERE t3.cliente_id = c.id ORDER BY fecha DESC LIMIT 1) as estilista
+        FROM clientes c
+        LEFT JOIN trabajos t ON c.id = t.cliente_id
+        WHERE CONCAT(c.nombre, ' ', c.apellido) LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ?
+        GROUP BY c.id
+        ORDER BY $orderBySQL $sortOrder
+        LIMIT ?
+    ");
+    
+    $searchTermWildcard = "%" . $searchTerm . "%";
+    $stmt->bind_param("sssi", $searchTermWildcard, $searchTermWildcard, $searchTermWildcard, $queryLimit);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $searchResults[] = $row;
+    }
+}
+
+// Check if we have more results than the limit
+if (count($searchResults) > $limit) {
+    $hasMore = true;
+    array_pop($searchResults); // Remove the extra item
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -123,16 +188,16 @@ $searchTerm = $params['search_term'];
                                 <tr>
                                     <th class="ps-3" style="width: 50px;">ID</th>
                                     
-                                    <th class="cursor-pointer user-select-none" onclick="sortList('nombre', '<?php echo ClientListController::getNextSortOrder('nombre', $sortBy, $sortOrder); ?>')">
-                                        Nombre <?php echo ClientListController::getSortIcon('nombre', $sortBy, $sortOrder); ?>
+                                    <th class="cursor-pointer user-select-none" onclick="sortList('nombre', '<?php echo getNextSortOrder('nombre', $sortBy, $sortOrder); ?>')">
+                                        Nombre <?php echo getSortIcon('nombre', $sortBy, $sortOrder); ?>
                                     </th>
                                     
-                                    <th class="cursor-pointer user-select-none" onclick="sortList('apellido', '<?php echo ClientListController::getNextSortOrder('apellido', $sortBy, $sortOrder); ?>')">
-                                        Apellido <?php echo ClientListController::getSortIcon('apellido', $sortBy, $sortOrder); ?>
+                                    <th class="cursor-pointer user-select-none" onclick="sortList('apellido', '<?php echo getNextSortOrder('apellido', $sortBy, $sortOrder); ?>')">
+                                        Apellido <?php echo getSortIcon('apellido', $sortBy, $sortOrder); ?>
                                     </th>
                                     
-                                    <th class="cursor-pointer user-select-none" onclick="sortList('fecha', '<?php echo ClientListController::getNextSortOrder('fecha', $sortBy, $sortOrder); ?>')">
-                                        <?php echo $listMode ? 'Última Visita' : 'Fecha'; ?> <?php echo ClientListController::getSortIcon('fecha', $sortBy, $sortOrder); ?>
+                                    <th class="cursor-pointer user-select-none" onclick="sortList('fecha', '<?php echo getNextSortOrder('fecha', $sortBy, $sortOrder); ?>')">
+                                        <?php echo $listMode ? 'Última Visita' : 'Fecha'; ?> <?php echo getSortIcon('fecha', $sortBy, $sortOrder); ?>
                                     </th>
                                     
                                     <th><?php echo $listMode ? 'Último Trabajo' : 'Trabajo Realizado'; ?></th>
